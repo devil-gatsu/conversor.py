@@ -117,7 +117,7 @@ class AppTotumseg(ctk.CTk):
             return f"{ramo}_{valor}.xls"
         return None
 
-    def transpor_dados(self):
+   def transpor_dados(self):
         pythoncom.CoInitialize()
         arquivos_origem = glob.glob(os.path.join(self.pasta_origem, "*.xlsm"))
         total = len(arquivos_origem)
@@ -131,7 +131,7 @@ class AppTotumseg(ctk.CTk):
             excel = win32.DispatchEx('Excel.Application')
             excel.Visible = False
             excel.DisplayAlerts = False
-            excel.AutomationSecurity = 3 # Bloqueia macros para evitar alertas de compilação
+            excel.AutomationSecurity = 3 
             excel.EnableEvents = False
 
             sucesso = 0
@@ -145,7 +145,7 @@ class AppTotumseg(ctk.CTk):
 
                 caminho_modelo = os.path.join(self.pasta_modelos, modelo_necessario)
                 if not os.path.exists(caminho_modelo):
-                    self.log(f"[X] Erro: Modelo {modelo_necessario} não encontrado na pasta de modelos.")
+                    self.log(f"[X] Erro: Modelo {modelo_necessario} não encontrado.")
                     continue
 
                 self.log(f"-> Transpondo: {nome_arq} => Usando template {modelo_necessario}")
@@ -157,7 +157,6 @@ class AppTotumseg(ctk.CTk):
                     wb_origem = excel.Workbooks.Open(os.path.abspath(caminho_xlsm), ReadOnly=True, UpdateLinks=False)
                     ws_origem = wb_origem.Sheets("Formulario")
                     
-                    # Define o tamanho dos dados copiados (Linha 6 em diante)
                     ultima_linha = ws_origem.Cells(ws_origem.Rows.Count, "A").End(-4162).Row
                     ultima_coluna = ws_origem.UsedRange.Columns.Count
 
@@ -166,12 +165,17 @@ class AppTotumseg(ctk.CTk):
                         wb_modelo = excel.Workbooks.Open(os.path.abspath(caminho_modelo), UpdateLinks=False)
                         ws_modelo = wb_modelo.Sheets("Formulario")
 
-                        # Transposição de Valores (.Value preserva formatação do destino)
-                        range_origem = ws_origem.Range(ws_origem.Cells(6, 1), ws_origem.Cells(ultima_linha, ultima_coluna))
-                        range_destino = ws_modelo.Range(ws_modelo.Cells(6, 1), ws_modelo.Cells(ultima_linha, ultima_coluna))
-                        range_destino.Value = range_origem.Value
+                        # Transposição Cirúrgica: Pula células protegidas pela seguradora
+                        for linha in range(6, ultima_linha + 1):
+                            for coluna in range(1, ultima_coluna + 1):
+                                celula_destino = ws_modelo.Cells(linha, coluna)
+                                
+                                # Só injeta o dado se a célula da Mapfre estiver destravada para digitação
+                                if not celula_destino.Locked:
+                                    valor_origem = ws_origem.Cells(linha, coluna).Value
+                                    if valor_origem is not None:
+                                        celula_destino.Value = valor_origem
 
-                        # Salva o resultado com o mesmo nome, porém .xls
                         novo_nome = nome_arq.replace(".xlsm", ".xls")
                         caminho_final = os.path.join(self.pasta_destino, novo_nome)
                         
@@ -188,7 +192,6 @@ class AppTotumseg(ctk.CTk):
                     if wb_origem: wb_origem.Close(SaveChanges=False)
                     if wb_modelo: wb_modelo.Close(SaveChanges=False)
 
-                # Atualiza Progresso
                 progresso = index / total
                 self.barra_progresso.set(progresso)
 
