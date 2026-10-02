@@ -100,18 +100,19 @@ class AppTotumseg(ctk.CTk):
         valor = ""
 
         # Identificar Ramo
-        if "ESCRIT" in nome_upper: ramo = "ESCRIT"
-        elif "COMER" in nome_upper: ramo = "COMER"
-        elif "APTO" in nome_upper or "APARTAMENTO" in nome_upper: ramo = "APTO"
-        elif "MADEIRA" in nome_upper: ramo = "CASA_MADEIRA"
-        elif "CASA" in nome_upper or "RESID" in nome_upper: ramo = "CASA"
+        if "MADEIRA" in nome_upper: ramo = "CASA_MADEIRA"
+        elif "CASA" in nome_upper: ramo = "CASA"
+        elif "APARTAMENTO" in nome_upper or "APTO" in nome_upper: ramo = "APTO"
+        elif "COMERCIO" in nome_upper or "COMER" in nome_upper: ramo = "COMER"
+        elif "ESCRITORIO" in nome_upper or "ESCRIT" in nome_upper: ramo = "ESCRIT"
 
         # Identificar Valor
         if "200000" in nome_upper: valor = "200"
         elif "300000" in nome_upper: valor = "300"
         elif "400000" in nome_upper: valor = "400"
         elif "600000" in nome_upper: valor = "600"
-
+        
+        # 3. Retornar a junção exata que deve bater com o nome do arquivo na Pasta de Modelos
         if ramo and valor:
             return f"{ramo}_{valor}.xls"
         return None
