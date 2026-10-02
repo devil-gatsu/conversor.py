@@ -106,6 +106,11 @@ class ConversorMapfre(ctk.CTk):
                 excel = win32.DispatchEx('Excel.Application')
                 excel.Visible = False
                 excel.DisplayAlerts = False
+
+                # --- NOVAS LINHAS PARA BLOQUEAR O ERRO DE VBA ---
+                excel.AutomationSecurity = 3  # 3 = msoAutomationSecurityForceDisable (Bloqueia execução de macros)
+                excel.EnableEvents = False    # Impede que gatilhos automáticos como "Workbook_Open" tentem rodar
+                # ------------------------------------------------
                 
                 for index, caminho_xlsm in enumerate(arquivos_xlsm, 1):
                     nome = os.path.basename(caminho_xlsm)
