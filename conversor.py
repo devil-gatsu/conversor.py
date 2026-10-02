@@ -21,7 +21,6 @@ class AppTotumseg(ctk.CTk):
         self.geometry("600x550")
         self.resizable(False, False)
 
-        # Variáveis de diretório
         self.pasta_modelos = ""
         self.pasta_origem = ""
         self.pasta_destino = ""
@@ -30,29 +29,24 @@ class AppTotumseg(ctk.CTk):
         self.lbl_titulo = ctk.CTkLabel(self, text="Transposição de Dados - Mapfre", font=("Segoe UI", 20, "bold"), text_color="#0047AB")
         self.lbl_titulo.pack(pady=15)
 
-        # Frame de Seleção de Pastas
         self.frame_pastas = ctk.CTkFrame(self, fg_color="white", corner_radius=10)
         self.frame_pastas.pack(pady=10, padx=20, fill="x")
 
-        # Botão 1: Modelos
         self.btn_modelos = ctk.CTkButton(self.frame_pastas, text="1. Selecionar Pasta de MODELOS", command=self.selecionar_modelos, fg_color="#0066cc")
         self.btn_modelos.grid(row=0, column=0, padx=15, pady=10, sticky="w")
         self.lbl_modelos = ctk.CTkLabel(self.frame_pastas, text="Nenhuma pasta selecionada", text_color="gray")
         self.lbl_modelos.grid(row=0, column=1, padx=10, pady=10, sticky="w")
 
-        # Botão 2: Origem
         self.btn_origem = ctk.CTkButton(self.frame_pastas, text="2. Selecionar Pasta de ORIGEM (.xlsm)", command=self.selecionar_origem, fg_color="#0066cc")
         self.btn_origem.grid(row=1, column=0, padx=15, pady=10, sticky="w")
         self.lbl_origem = ctk.CTkLabel(self.frame_pastas, text="Nenhuma pasta selecionada", text_color="gray")
         self.lbl_origem.grid(row=1, column=1, padx=10, pady=10, sticky="w")
 
-        # Botão 3: Destino
         self.btn_destino = ctk.CTkButton(self.frame_pastas, text="3. Selecionar Pasta de DESTINO", command=self.selecionar_destino, fg_color="#0066cc")
         self.btn_destino.grid(row=2, column=0, padx=15, pady=10, sticky="w")
         self.lbl_destino = ctk.CTkLabel(self.frame_pastas, text="Nenhuma pasta selecionada", text_color="gray")
         self.lbl_destino.grid(row=2, column=1, padx=10, pady=10, sticky="w")
 
-        # Log e Progresso
         self.txt_log = ctk.CTkTextbox(self, width=560, height=150, fg_color="#f0f4f8", text_color="black")
         self.txt_log.pack(pady=10)
         self.txt_log.insert("0.0", "Aguardando inicialização...\n")
@@ -62,7 +56,6 @@ class AppTotumseg(ctk.CTk):
         self.barra_progresso.pack(pady=5)
         self.barra_progresso.set(0)
 
-        # Botão Processar
         self.btn_processar = ctk.CTkButton(self, text="INICIAR TRANSPOSIÇÃO", command=self.iniciar_processo, font=("Segoe UI", 14, "bold"), fg_color="#28a745", hover_color="#218838")
         self.btn_processar.pack(pady=15)
 
@@ -99,25 +92,34 @@ class AppTotumseg(ctk.CTk):
         ramo = ""
         valor = ""
 
-        # Identificar Ramo
-        if "MADEIRA" in nome_upper: ramo = "CASA_MADEIRA"
-        elif "CASA" in nome_upper: ramo = "CASA"
-        elif "APARTAMENTO" in nome_upper or "APTO" in nome_upper: ramo = "APTO"
-        elif "COMERCIO" in nome_upper or "COMER" in nome_upper: ramo = "COMER"
-        elif "ESCRITORIO" in nome_upper or "ESCRIT" in nome_upper: ramo = "ESCRIT"
+        # 1. Identificar Ramo (MADEIRA tem precedência sobre CASA)
+        if "MADEIRA" in nome_upper: 
+            ramo = "CASA_MADEIRA"
+        elif "CASA" in nome_upper: 
+            ramo = "CASA"
+        elif "APARTAMENTO" in nome_upper or "APTO" in nome_upper: 
+            ramo = "APTO"
+        elif "COMERCIO" in nome_upper or "COMER" in nome_upper: 
+            ramo = "COMER"
+        elif "ESCRITORIO" in nome_upper or "ESCRIT" in nome_upper: 
+            ramo = "ESCRIT"
 
-        # Identificar Valor
-        if "200000" in nome_upper: valor = "200"
-        elif "300000" in nome_upper: valor = "300"
-        elif "400000" in nome_upper: valor = "400"
-        elif "600000" in nome_upper: valor = "600"
-        
-        # 3. Retornar a junção exata que deve bater com o nome do arquivo na Pasta de Modelos
+        # 2. Identificar Valor do Imóvel
+        if "200000" in nome_upper: 
+            valor = "200"
+        elif "300000" in nome_upper: 
+            valor = "300"
+        elif "400000" in nome_upper: 
+            valor = "400"
+        elif "600000" in nome_upper: 
+            valor = "600"
+
+        # 3. Retornar junção exata
         if ramo and valor:
             return f"{ramo}_{valor}.xls"
         return None
 
-   def transpor_dados(self):
+    def transpor_dados(self):
         pythoncom.CoInitialize()
         arquivos_origem = glob.glob(os.path.join(self.pasta_origem, "*.xlsm"))
         total = len(arquivos_origem)
@@ -131,7 +133,7 @@ class AppTotumseg(ctk.CTk):
             excel = win32.DispatchEx('Excel.Application')
             excel.Visible = False
             excel.DisplayAlerts = False
-            excel.AutomationSecurity = 3 
+            excel.AutomationSecurity = 3 # Bloqueia macros para evitar alertas de compilação
             excel.EnableEvents = False
 
             sucesso = 0
@@ -145,7 +147,7 @@ class AppTotumseg(ctk.CTk):
 
                 caminho_modelo = os.path.join(self.pasta_modelos, modelo_necessario)
                 if not os.path.exists(caminho_modelo):
-                    self.log(f"[X] Erro: Modelo {modelo_necessario} não encontrado.")
+                    self.log(f"[X] Erro: Modelo {modelo_necessario} não encontrado na pasta selecionada.")
                     continue
 
                 self.log(f"-> Transpondo: {nome_arq} => Usando template {modelo_necessario}")
@@ -153,45 +155,55 @@ class AppTotumseg(ctk.CTk):
                 wb_origem = None
                 wb_modelo = None
                 try:
-                    # Abre Origem
+                    # Abre Origem e Modelo
                     wb_origem = excel.Workbooks.Open(os.path.abspath(caminho_xlsm), ReadOnly=True, UpdateLinks=False)
                     ws_origem = wb_origem.Sheets("Formulario")
                     
-                    ultima_linha = ws_origem.Cells(ws_origem.Rows.Count, "A").End(-4162).Row
-                    ultima_coluna = ws_origem.UsedRange.Columns.Count
+                    wb_modelo = excel.Workbooks.Open(os.path.abspath(caminho_modelo), UpdateLinks=False)
+                    ws_modelo = wb_modelo.Sheets("Formulario")
 
-                    if ultima_linha >= 6:
-                        # Abre Template Base
-                        wb_modelo = excel.Workbooks.Open(os.path.abspath(caminho_modelo), UpdateLinks=False)
-                        ws_modelo = wb_modelo.Sheets("Formulario")
+                    linha = 6
+                    linhas_processadas = 0
 
-                        # Transposição Cirúrgica: Pula células protegidas pela seguradora
-                        for linha in range(6, ultima_linha + 1):
-                            for coluna in range(1, ultima_coluna + 1):
-                                celula_destino = ws_modelo.Cells(linha, coluna)
-                                
-                                # Só injeta o dado se a célula da Mapfre estiver destravada para digitação
-                                if not celula_destino.Locked:
-                                    valor_origem = ws_origem.Cells(linha, coluna).Value
-                                    if valor_origem is not None:
-                                        celula_destino.Value = valor_origem
+                    # Loop percorrendo as linhas a partir da 6
+                    while True:
+                        # Condição de Parada: Se a coluna B (índice 2) estiver vazia, encerra a busca neste arquivo
+                        valor_verificador = ws_origem.Cells(linha, 2).Value
+                        if valor_verificador is None or str(valor_verificador).strip() == "":
+                            break
 
+                        # Varre apenas da coluna B (2) até a coluna AN (40)
+                        for coluna in range(2, 41):
+                            celula_destino = ws_modelo.Cells(linha, coluna)
+                            
+                            # Transposição Cirúrgica: Pula células bloqueadas por senha
+                            if not celula_destino.Locked:
+                                valor_origem = ws_origem.Cells(linha, coluna).Value
+                                if valor_origem is not None:
+                                    celula_destino.Value = valor_origem
+                        
+                        linha += 1
+                        linhas_processadas += 1
+
+                    if linhas_processadas > 0:
+                        # Salva o resultado com o mesmo nome, porém .xls (Formato 56)
                         novo_nome = nome_arq.replace(".xlsm", ".xls")
                         caminho_final = os.path.join(self.pasta_destino, novo_nome)
                         
                         wb_modelo.SaveAs(os.path.abspath(caminho_final), FileFormat=56)
-                        wb_modelo.Close(SaveChanges=False)
                         sucesso += 1
                     else:
-                        self.log(f"[!] Aviso: Nenhuma linha de dado encontrada a partir da linha 6 em {nome_arq}")
+                        self.log(f"[!] Aviso: Nenhuma linha com dados encontrada a partir da linha 6 em {nome_arq}")
                         
                     wb_origem.Close(SaveChanges=False)
+                    wb_modelo.Close(SaveChanges=False)
 
                 except Exception as e_interno:
                     self.log(f"[X] Erro ao manipular o arquivo {nome_arq}: {e_interno}")
                     if wb_origem: wb_origem.Close(SaveChanges=False)
                     if wb_modelo: wb_modelo.Close(SaveChanges=False)
 
+                # Atualiza Progresso
                 progresso = index / total
                 self.barra_progresso.set(progresso)
 
