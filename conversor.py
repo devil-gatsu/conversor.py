@@ -1,169 +1,205 @@
 import os
 import glob
-import subprocess
+import threading
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-import threading
 
-# Importação condicional para evitar quebra se a lib não estiver instalada perfeitamente
 try:
     import win32com.client as win32
     import pythoncom
-    COM_DISPONIVEL = True
 except ImportError:
-    COM_DISPONIVEL = False
+    pass # Tratamento para compilação
 
-ctk.set_appearance_mode("dark")
+# Configuração visual do CustomTkinter (Branco e Azul)
+ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
-class ConversorMapfre(ctk.CTk):
+class AppTotumseg(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Conversor de Planilhas - Mapfre")
-        self.geometry("500x420")
+        self.title("Totumseg - Jet x Mapfre xls")
+        self.geometry("600x550")
         self.resizable(False, False)
 
+        # Variáveis de diretório
+        self.pasta_modelos = ""
         self.pasta_origem = ""
         self.pasta_destino = ""
-        self.motor_selecionado = ctk.StringVar(value="libreoffice") # Padrão definido para LibreOffice
 
-        self.lbl_titulo = ctk.CTkLabel(self, text="Conversor XLSM para XLS", font=("Roboto", 16, "bold"))
+        # ================= INTERFACE =================
+        self.lbl_titulo = ctk.CTkLabel(self, text="Transposição de Dados - Mapfre", font=("Segoe UI", 20, "bold"), text_color="#0047AB")
         self.lbl_titulo.pack(pady=15)
 
-        # Seleção do Motor
-        self.frame_motor = ctk.CTkFrame(self)
-        self.frame_motor.pack(pady=5, padx=20, fill="x")
-        
-        self.lbl_motor = ctk.CTkLabel(self.frame_motor, text="Selecione o programa instalado na máquina:", font=("Roboto", 12))
-        self.lbl_motor.pack(pady=(5, 0))
-        
-        self.radio_libre = ctk.CTkRadioButton(self.frame_motor, text="LibreOffice Calc", variable=self.motor_selecionado, value="libreoffice")
-        self.radio_libre.pack(side="left", padx=20, pady=10)
-        
-        self.radio_excel = ctk.CTkRadioButton(self.frame_motor, text="Microsoft Excel", variable=self.motor_selecionado, value="excel")
-        self.radio_excel.pack(side="right", padx=20, pady=10)
+        # Frame de Seleção de Pastas
+        self.frame_pastas = ctk.CTkFrame(self, fg_color="white", corner_radius=10)
+        self.frame_pastas.pack(pady=10, padx=20, fill="x")
 
-        # Botões de Diretório
-        self.btn_origem = ctk.CTkButton(self, text="1. Selecionar Pasta Origem (.xlsm)", command=self.selecionar_origem)
-        self.btn_origem.pack(pady=10)
+        # Botão 1: Modelos
+        self.btn_modelos = ctk.CTkButton(self.frame_pastas, text="1. Selecionar Pasta de MODELOS", command=self.selecionar_modelos, fg_color="#0066cc")
+        self.btn_modelos.grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        self.lbl_modelos = ctk.CTkLabel(self.frame_pastas, text="Nenhuma pasta selecionada", text_color="gray")
+        self.lbl_modelos.grid(row=0, column=1, padx=10, pady=10, sticky="w")
 
-        self.btn_destino = ctk.CTkButton(self, text="2. Selecionar Pasta Destino", command=self.selecionar_destino)
-        self.btn_destino.pack(pady=10)
+        # Botão 2: Origem
+        self.btn_origem = ctk.CTkButton(self.frame_pastas, text="2. Selecionar Pasta de ORIGEM (.xlsm)", command=self.selecionar_origem, fg_color="#0066cc")
+        self.btn_origem.grid(row=1, column=0, padx=15, pady=10, sticky="w")
+        self.lbl_origem = ctk.CTkLabel(self.frame_pastas, text="Nenhuma pasta selecionada", text_color="gray")
+        self.lbl_origem.grid(row=1, column=1, padx=10, pady=10, sticky="w")
 
-        self.lbl_status = ctk.CTkLabel(self, text="Aguardando seleção de pastas...", text_color="gray")
-        self.lbl_status.pack(pady=10)
+        # Botão 3: Destino
+        self.btn_destino = ctk.CTkButton(self.frame_pastas, text="3. Selecionar Pasta de DESTINO", command=self.selecionar_destino, fg_color="#0066cc")
+        self.btn_destino.grid(row=2, column=0, padx=15, pady=10, sticky="w")
+        self.lbl_destino = ctk.CTkLabel(self.frame_pastas, text="Nenhuma pasta selecionada", text_color="gray")
+        self.lbl_destino.grid(row=2, column=1, padx=10, pady=10, sticky="w")
 
-        self.btn_converter = ctk.CTkButton(self, text="3. Iniciar Conversão", command=self.iniciar_thread_conversao, fg_color="green", hover_color="darkgreen")
-        self.btn_converter.pack(pady=15)
+        # Log e Progresso
+        self.txt_log = ctk.CTkTextbox(self, width=560, height=150, fg_color="#f0f4f8", text_color="black")
+        self.txt_log.pack(pady=10)
+        self.txt_log.insert("0.0", "Aguardando inicialização...\n")
+        self.txt_log.configure(state="disabled")
+
+        self.barra_progresso = ctk.CTkProgressBar(self, width=560, progress_color="#0047AB")
+        self.barra_progresso.pack(pady=5)
+        self.barra_progresso.set(0)
+
+        # Botão Processar
+        self.btn_processar = ctk.CTkButton(self, text="INICIAR TRANSPOSIÇÃO", command=self.iniciar_processo, font=("Segoe UI", 14, "bold"), fg_color="#28a745", hover_color="#218838")
+        self.btn_processar.pack(pady=15)
+
+    # ================= FUNÇÕES DE SELEÇÃO =================
+    def selecionar_modelos(self):
+        self.pasta_modelos = filedialog.askdirectory(title="Selecione a pasta com os Modelos XLS")
+        if self.pasta_modelos: self.lbl_modelos.configure(text=os.path.basename(self.pasta_modelos), text_color="black")
 
     def selecionar_origem(self):
         self.pasta_origem = filedialog.askdirectory(title="Selecione a pasta Origem")
-        if self.pasta_origem:
-            self.atualizar_status(f"Origem: {os.path.basename(self.pasta_origem)}", "white")
+        if self.pasta_origem: self.lbl_origem.configure(text=os.path.basename(self.pasta_origem), text_color="black")
 
     def selecionar_destino(self):
         self.pasta_destino = filedialog.askdirectory(title="Selecione a pasta Destino")
-        if self.pasta_destino:
-            self.atualizar_status(f"Destino: {os.path.basename(self.pasta_destino)}", "white")
+        if self.pasta_destino: self.lbl_destino.configure(text=os.path.basename(self.pasta_destino), text_color="black")
 
-    def iniciar_thread_conversao(self):
-        if not self.pasta_origem or not self.pasta_destino:
-            messagebox.showwarning("Aviso", "Selecione as pastas de origem e destino.")
+    def log(self, mensagem):
+        self.txt_log.configure(state="normal")
+        self.txt_log.insert("end", mensagem + "\n")
+        self.txt_log.see("end")
+        self.txt_log.configure(state="disabled")
+
+    # ================= LÓGICA CORE =================
+    def iniciar_processo(self):
+        if not all([self.pasta_modelos, self.pasta_origem, self.pasta_destino]):
+            messagebox.showwarning("Atenção", "Por favor, selecione as três pastas antes de iniciar.")
             return
         
-        self.btn_converter.configure(state="disabled", text="Convertendo...")
-        threading.Thread(target=self.processar_conversao, daemon=True).start()
+        self.btn_processar.configure(state="disabled", text="PROCESSANDO...")
+        threading.Thread(target=self.transpor_dados, daemon=True).start()
 
-    def buscar_libreoffice(self):
-        # Mapeia caminhos padrão de instalação do LibreOffice no Windows
-        caminhos = [
-            r"C:\Program Files\LibreOffice\program\soffice.exe",
-            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
-        ]
-        for caminho in caminhos:
-            if os.path.exists(caminho):
-                return caminho
+    def identificar_modelo(self, nome_arquivo):
+        nome_upper = nome_arquivo.upper()
+        ramo = ""
+        valor = ""
+
+        # Identificar Ramo
+        if "ESCRIT" in nome_upper: ramo = "ESCRIT"
+        elif "COMER" in nome_upper: ramo = "COMER"
+        elif "APTO" in nome_upper or "APARTAMENTO" in nome_upper: ramo = "APTO"
+        elif "MADEIRA" in nome_upper: ramo = "CASA_MADEIRA"
+        elif "CASA" in nome_upper or "RESID" in nome_upper: ramo = "CASA"
+
+        # Identificar Valor
+        if "200000" in nome_upper: valor = "200"
+        elif "300000" in nome_upper: valor = "300"
+        elif "400000" in nome_upper: valor = "400"
+        elif "600000" in nome_upper: valor = "600"
+
+        if ramo and valor:
+            return f"{ramo}_{valor}.xls"
         return None
 
-    def processar_conversao(self):
-        arquivos_xlsm = glob.glob(os.path.join(self.pasta_origem, "*.xlsm"))
-        total = len(arquivos_xlsm)
-        
+    def transpor_dados(self):
+        pythoncom.CoInitialize()
+        arquivos_origem = glob.glob(os.path.join(self.pasta_origem, "*.xlsm"))
+        total = len(arquivos_origem)
+
         if total == 0:
-            self.atualizar_status("Nenhum arquivo .xlsm encontrado.", "red", normalizar=True)
+            self.log("Nenhum arquivo .xlsm encontrado na pasta de origem.")
+            self.btn_processar.configure(state="normal", text="INICIAR TRANSPOSIÇÃO")
             return
 
-        motor = self.motor_selecionado.get()
-        sucesso = 0
+        try:
+            excel = win32.DispatchEx('Excel.Application')
+            excel.Visible = False
+            excel.DisplayAlerts = False
+            excel.AutomationSecurity = 3 # Bloqueia macros para evitar alertas de compilação
+            excel.EnableEvents = False
 
-        if motor == "excel":
-            if not COM_DISPONIVEL:
-                self.atualizar_status("Erro: Bibliotecas win32com ausentes.", "red", normalizar=True)
-                return
-            
-            try:
-                pythoncom.CoInitialize()
-                excel = win32.DispatchEx('Excel.Application')
-                excel.Visible = False
-                excel.DisplayAlerts = False
+            sucesso = 0
+            for index, caminho_xlsm in enumerate(arquivos_origem, 1):
+                nome_arq = os.path.basename(caminho_xlsm)
+                modelo_necessario = self.identificar_modelo(nome_arq)
 
-                # --- NOVAS LINHAS PARA BLOQUEAR O ERRO DE VBA ---
-                excel.AutomationSecurity = 3  # 3 = msoAutomationSecurityForceDisable (Bloqueia execução de macros)
-                excel.EnableEvents = False    # Impede que gatilhos automáticos como "Workbook_Open" tentem rodar
-                # ------------------------------------------------
-                
-                for index, caminho_xlsm in enumerate(arquivos_xlsm, 1):
-                    nome = os.path.basename(caminho_xlsm)
-                    self.atualizar_status(f"Excel processando ({index}/{total}): {nome}", "yellow")
-                    
-                    caminho_xls = os.path.join(self.pasta_destino, nome.replace(".xlsm", ".xls"))
-                    wb = excel.Workbooks.Open(os.path.abspath(caminho_xlsm))
-                    wb.SaveAs(os.path.abspath(caminho_xls), FileFormat=56)
-                    wb.Close(SaveChanges=False)
-                    sucesso += 1
-            except Exception as e:
-                self.atualizar_status(f"Falha COM: {str(e)}", "red", normalizar=True)
-                return
-            finally:
-                excel.Quit()
-                pythoncom.CoUninitialize()
+                if not modelo_necessario:
+                    self.log(f"[X] Ignorado: {nome_arq} (Não foi possível identificar o modelo pelo nome)")
+                    continue
 
-        elif motor == "libreoffice":
-            caminho_soffice = self.buscar_libreoffice()
-            if not caminho_soffice:
-                self.atualizar_status("Erro: LibreOffice (soffice.exe) não encontrado.", "red", normalizar=True)
-                return
-            
-            for index, caminho_xlsm in enumerate(arquivos_xlsm, 1):
-                nome = os.path.basename(caminho_xlsm)
-                self.atualizar_status(f"LibreOffice processando ({index}/{total}): {nome}", "yellow")
-                
-                # Flag de criação para não piscar tela de terminal no Windows durante a conversão
-                creation_flags = 0
-                if os.name == 'nt':
-                    creation_flags = subprocess.CREATE_NO_WINDOW
-                
-                comando = [
-                    caminho_soffice,
-                    "--headless",
-                    "--convert-to", "xls",
-                    "--outdir", self.pasta_destino,
-                    caminho_xlsm
-                ]
-                
+                caminho_modelo = os.path.join(self.pasta_modelos, modelo_necessario)
+                if not os.path.exists(caminho_modelo):
+                    self.log(f"[X] Erro: Modelo {modelo_necessario} não encontrado na pasta de modelos.")
+                    continue
+
+                self.log(f"-> Transpondo: {nome_arq} => Usando template {modelo_necessario}")
+
+                wb_origem = None
+                wb_modelo = None
                 try:
-                    subprocess.run(comando, check=True, creationflags=creation_flags)
-                    sucesso += 1
-                except subprocess.CalledProcessError as e:
-                    print(f"Erro ao converter {nome}: {e}")
+                    # Abre Origem
+                    wb_origem = excel.Workbooks.Open(os.path.abspath(caminho_xlsm), ReadOnly=True, UpdateLinks=False)
+                    ws_origem = wb_origem.Sheets("Formulario")
+                    
+                    # Define o tamanho dos dados copiados (Linha 6 em diante)
+                    ultima_linha = ws_origem.Cells(ws_origem.Rows.Count, "A").End(-4162).Row
+                    ultima_coluna = ws_origem.UsedRange.Columns.Count
 
-        self.atualizar_status(f"Concluído! {sucesso} de {total} convertidos via {motor.upper()}.", "green", normalizar=True)
+                    if ultima_linha >= 6:
+                        # Abre Template Base
+                        wb_modelo = excel.Workbooks.Open(os.path.abspath(caminho_modelo), UpdateLinks=False)
+                        ws_modelo = wb_modelo.Sheets("Formulario")
 
-    def atualizar_status(self, mensagem, cor, normalizar=False):
-        self.lbl_status.configure(text=mensagem, text_color=cor)
-        if normalizar:
-            self.btn_converter.configure(state="normal", text="3. Iniciar Conversão")
+                        # Transposição de Valores (.Value preserva formatação do destino)
+                        range_origem = ws_origem.Range(ws_origem.Cells(6, 1), ws_origem.Cells(ultima_linha, ultima_coluna))
+                        range_destino = ws_modelo.Range(ws_modelo.Cells(6, 1), ws_modelo.Cells(ultima_linha, ultima_coluna))
+                        range_destino.Value = range_origem.Value
+
+                        # Salva o resultado com o mesmo nome, porém .xls
+                        novo_nome = nome_arq.replace(".xlsm", ".xls")
+                        caminho_final = os.path.join(self.pasta_destino, novo_nome)
+                        
+                        wb_modelo.SaveAs(os.path.abspath(caminho_final), FileFormat=56)
+                        wb_modelo.Close(SaveChanges=False)
+                        sucesso += 1
+                    else:
+                        self.log(f"[!] Aviso: Nenhuma linha de dado encontrada a partir da linha 6 em {nome_arq}")
+                        
+                    wb_origem.Close(SaveChanges=False)
+
+                except Exception as e_interno:
+                    self.log(f"[X] Erro ao manipular o arquivo {nome_arq}: {e_interno}")
+                    if wb_origem: wb_origem.Close(SaveChanges=False)
+                    if wb_modelo: wb_modelo.Close(SaveChanges=False)
+
+                # Atualiza Progresso
+                progresso = index / total
+                self.barra_progresso.set(progresso)
+
+            self.log(f"\n[OK] Processo finalizado! {sucesso} arquivos transpostos com sucesso.")
+
+        except Exception as e:
+            self.log(f"[ERRO FATAL] Ocorreu um problema de comunicação com o Excel: {str(e)}")
+        finally:
+            excel.Quit()
+            pythoncom.CoUninitialize()
+            self.btn_processar.configure(state="normal", text="INICIAR TRANSPOSIÇÃO")
 
 if __name__ == "__main__":
-    app = ConversorMapfre()
+    app = AppTotumseg()
     app.mainloop()
