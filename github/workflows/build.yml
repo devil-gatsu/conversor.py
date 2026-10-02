@@ -3,7 +3,7 @@ name: Build Executável Windows
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Permite rodar a compilação manualmente no GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11' # Versão estável e compatível
+        python-version: '3.11'
 
     - name: Instalar dependências
       run: |
@@ -31,5 +31,5 @@ jobs:
     - name: Fazer Upload do Executável
       uses: actions/upload-artifact@v4
       with:
-        name: ConversorMapfre-EXE
+        name: Conversor-Mapfre-EXE
         path: dist/conversor.exe
