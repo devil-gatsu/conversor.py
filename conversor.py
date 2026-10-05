@@ -197,13 +197,30 @@ class AppTotumseg(ctk.CTk):
                         if valor_verificador is None or str(valor_verificador).strip() == "":
                             break
 
-                        # Varre apenas da coluna B (2) até a coluna AN (40)
                         for coluna in range(2, 41):
                             celula_destino = ws_modelo.Cells(linha, coluna)
                             
-                            # Injeta os valores APENAS se a célula do modelo permitir digitação
                             if not celula_destino.Locked:
                                 valor_origem = ws_origem.Cells(linha, coluna).Value
+                                
+                                # --- FILTRO SANITIZADOR MAPFRE ---
+                                if isinstance(valor_origem, str):
+                                    texto = valor_origem.strip()
+                                    texto_upper = texto.upper()
+                                    
+                                    # Corrige ausência do código ID no País
+                                    if texto_upper == "BRASIL":
+                                        valor_origem = "1-BRASIL"
+                                        
+                                    # Formata CPFs crus (11 dígitos) com pontuação
+                                    elif len(texto) == 11 and texto.isdigit():
+                                        valor_origem = f"{texto[:3]}.{texto[3:6]}.{texto[6:9]}-{texto[9:]}"
+                                        
+                                    # Formata CNPJs crus (14 dígitos) com pontuação
+                                    elif len(texto) == 14 and texto.isdigit():
+                                        valor_origem = f"{texto[:2]}.{texto[2:5]}.{texto[5:8]}/{texto[8:12]}-{texto[12:]}"
+                                # ---------------------------------
+
                                 if valor_origem is not None:
                                     celula_destino.Value = valor_origem
                         
