@@ -37,7 +37,7 @@ class AppTotumseg(ctk.CTk):
         self.lbl_modelos = ctk.CTkLabel(self.frame_pastas, text="Nenhuma pasta selecionada", text_color="gray")
         self.lbl_modelos.grid(row=0, column=1, padx=10, pady=10, sticky="w")
 
-        self.btn_origem = ctk.CTkButton(self.frame_pastas, text="2. Selecionar Pasta de ORIGEM (.xlsm)", command=self.selecionar_origem, fg_color="#0066cc")
+        self.btn_origem = ctk.CTkButton(self.frame_pastas, text="2. Selecionar Pasta de ORIGEM (.xlsx / .xlsm)", command=self.selecionar_origem, fg_color="#0066cc")
         self.btn_origem.grid(row=1, column=0, padx=15, pady=10, sticky="w")
         self.lbl_origem = ctk.CTkLabel(self.frame_pastas, text="Nenhuma pasta selecionada", text_color="gray")
         self.lbl_origem.grid(row=1, column=1, padx=10, pady=10, sticky="w")
@@ -61,15 +61,15 @@ class AppTotumseg(ctk.CTk):
 
     # ================= FUNÇÕES DE SELEÇÃO =================
     def selecionar_modelos(self):
-        self.pasta_modelos = filedialog.askdirectory(title="Selecione a pasta com os Modelos XLS")
+        self.pasta_modelos = filedialog.askdirectory(title="Selecione a pasta com os Modelos XLS da Mapfre")
         if self.pasta_modelos: self.lbl_modelos.configure(text=os.path.basename(self.pasta_modelos), text_color="black")
 
     def selecionar_origem(self):
-        self.pasta_origem = filedialog.askdirectory(title="Selecione a pasta Origem")
+        self.pasta_origem = filedialog.askdirectory(title="Selecione a pasta com as planilhas do seu sistema")
         if self.pasta_origem: self.lbl_origem.configure(text=os.path.basename(self.pasta_origem), text_color="black")
 
     def selecionar_destino(self):
-        self.pasta_destino = filedialog.askdirectory(title="Selecione a pasta Destino")
+        self.pasta_destino = filedialog.askdirectory(title="Selecione a pasta onde salvar os arquivos finais")
         if self.pasta_destino: self.lbl_destino.configure(text=os.path.basename(self.pasta_destino), text_color="black")
 
     def log(self, mensagem):
@@ -92,40 +92,32 @@ class AppTotumseg(ctk.CTk):
         ramo = ""
         valor = ""
 
-        # 1. Identificar Ramo (MADEIRA tem precedência sobre CASA)
-        if "MADEIRA" in nome_upper: 
-            ramo = "CASA_MADEIRA"
-        elif "CASA" in nome_upper: 
-            ramo = "CASA"
-        elif "APARTAMENTO" in nome_upper or "APTO" in nome_upper: 
-            ramo = "APTO"
-        elif "COMERCIO" in nome_upper or "COMER" in nome_upper: 
-            ramo = "COMER"
-        elif "ESCRITORIO" in nome_upper or "ESCRIT" in nome_upper: 
-            ramo = "ESCRIT"
+        if "MADEIRA" in nome_upper: ramo = "CASA_MADEIRA"
+        elif "CASA" in nome_upper: ramo = "CASA"
+        elif "APARTAMENTO" in nome_upper or "APTO" in nome_upper: ramo = "APTO"
+        elif "COMERCIO" in nome_upper or "COMER" in nome_upper: ramo = "COMER"
+        elif "ESCRITORIO" in nome_upper or "ESCRIT" in nome_upper: ramo = "ESCRIT"
 
-        # 2. Identificar Valor do Imóvel
-        if "200000" in nome_upper: 
-            valor = "200"
-        elif "300000" in nome_upper: 
-            valor = "300"
-        elif "400000" in nome_upper: 
-            valor = "400"
-        elif "600000" in nome_upper: 
-            valor = "600"
+        if "200000" in nome_upper: valor = "200"
+        elif "300000" in nome_upper: valor = "300"
+        elif "400000" in nome_upper: valor = "400"
+        elif "600000" in nome_upper: valor = "600"
 
-        # 3. Retornar junção exata
         if ramo and valor:
             return f"{ramo}_{valor}.xls"
         return None
 
     def transpor_dados(self):
         pythoncom.CoInitialize()
+        
+        # Lê tanto os arquivos .xlsm quanto os arquivos brutos .xlsx
         arquivos_origem = glob.glob(os.path.join(self.pasta_origem, "*.xlsm"))
+        arquivos_origem.extend(glob.glob(os.path.join(self.pasta_origem, "*.xlsx")))
+        
         total = len(arquivos_origem)
 
         if total == 0:
-            self.log("Nenhum arquivo .xlsm encontrado na pasta de origem.")
+            self.log("Nenhum arquivo .xlsm ou .xlsx encontrado na pasta de origem.")
             self.btn_processar.configure(state="normal", text="INICIAR TRANSPOSIÇÃO")
             return
 
@@ -133,12 +125,12 @@ class AppTotumseg(ctk.CTk):
             excel = win32.DispatchEx('Excel.Application')
             excel.Visible = False
             excel.DisplayAlerts = False
-            excel.AutomationSecurity = 3 # Bloqueia macros para evitar alertas de compilação
+            excel.AutomationSecurity = 3 # Bloqueia macros durante o processo
             excel.EnableEvents = False
 
             sucesso = 0
-            for index, caminho_xlsm in enumerate(arquivos_origem, 1):
-                nome_arq = os.path.basename(caminho_xlsm)
+            for index, caminho_arquivo in enumerate(arquivos_origem, 1):
+                nome_arq = os.path.basename(caminho_arquivo)
                 modelo_necessario = self.identificar_modelo(nome_arq)
 
                 if not modelo_necessario:
@@ -156,8 +148,8 @@ class AppTotumseg(ctk.CTk):
                 wb_modelo = None
                 try:
                     # Abre Origem e Modelo
-                    wb_origem = excel.Workbooks.Open(os.path.abspath(caminho_xlsm), ReadOnly=True, UpdateLinks=False)
-                    ws_origem = wb_origem.Sheets("Formulario")
+                    wb_origem = excel.Workbooks.Open(os.path.abspath(caminho_arquivo), ReadOnly=True, UpdateLinks=False)
+                    ws_origem = wb_origem.Sheets(1) # Lê sempre a primeira aba
                     
                     wb_modelo = excel.Workbooks.Open(os.path.abspath(caminho_modelo), UpdateLinks=False)
                     ws_modelo = wb_modelo.Sheets("Formulario")
@@ -165,9 +157,8 @@ class AppTotumseg(ctk.CTk):
                     linha = 6
                     linhas_processadas = 0
 
-                    # Loop percorrendo as linhas a partir da 6
                     while True:
-                        # Condição de Parada: Se a coluna B (índice 2) estiver vazia, encerra a busca neste arquivo
+                        # Para de varrer se a coluna B estiver vazia
                         valor_verificador = ws_origem.Cells(linha, 2).Value
                         if valor_verificador is None or str(valor_verificador).strip() == "":
                             break
@@ -176,7 +167,8 @@ class AppTotumseg(ctk.CTk):
                         for coluna in range(2, 41):
                             celula_destino = ws_modelo.Cells(linha, coluna)
                             
-                            # Transposição Cirúrgica: Pula células bloqueadas por senha
+                            # Injeta os valores APENAS se a célula do modelo permitir digitação
+                            # O uso de .Value faz exatamente o "Colar Especial > Valores", preservando o layout
                             if not celula_destino.Locked:
                                 valor_origem = ws_origem.Cells(linha, coluna).Value
                                 if valor_origem is not None:
@@ -186,8 +178,8 @@ class AppTotumseg(ctk.CTk):
                         linhas_processadas += 1
 
                     if linhas_processadas > 0:
-                        # Salva o resultado com o mesmo nome, porém .xls (Formato 56)
-                        novo_nome = nome_arq.replace(".xlsm", ".xls")
+                        # Salva o resultado final no formato aceito (Excel 97-2003)
+                        novo_nome = nome_arq.replace(".xlsm", ".xls").replace(".xlsx", ".xls")
                         caminho_final = os.path.join(self.pasta_destino, novo_nome)
                         
                         wb_modelo.SaveAs(os.path.abspath(caminho_final), FileFormat=56)
@@ -203,7 +195,6 @@ class AppTotumseg(ctk.CTk):
                     if wb_origem: wb_origem.Close(SaveChanges=False)
                     if wb_modelo: wb_modelo.Close(SaveChanges=False)
 
-                # Atualiza Progresso
                 progresso = index / total
                 self.barra_progresso.set(progresso)
 
